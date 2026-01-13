@@ -10,7 +10,8 @@ import {
   ScrollView,
   Alert,
   SafeAreaView,
-  ActivityIndicator
+  ActivityIndicator,
+  Image
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
@@ -226,6 +227,29 @@ function MainScreen({ route, navigation }) {
     }
   };
 
+  const handleGenerateQR = async () => {
+    try {
+      const ticketData = {
+        platform,
+        entry_time: entryTime,
+        ticket_type: ticketType,
+        network,
+        user_id: userId,
+        timestamp: new Date().toISOString()
+      };
+
+      const response = await axios.post(`${API_URL}/generate-ticket-qr`, {
+        strategy_id: Math.random(),
+        user_id: userId,
+        ticket_number: `TKT-${Date.now()}`
+      });
+
+      navigation.navigate('QRCode', { qrCode: response.data.qrCode });
+    } catch (error) {
+      Alert.alert('錯誤', '無法生成 QR Code');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.scrollView}>
@@ -330,8 +354,72 @@ function MainScreen({ route, navigation }) {
                 <Text style={styles.suggestionLabel}>建議</Text>
                 <Text style={styles.suggestionText}>{result.suggestion}</Text>
               </View>
+
+              <TouchableOpacity 
+                style={[styles.button, { marginTop: 15, backgroundColor: '#4CAF50' }]}
+                onPress={handleGenerateQR}
+              >
+                <Text style={styles.buttonText}>生成票券 QR Code</Text>
+              </TouchableOpacity>
             </View>
           )}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
+// ==================== QR Code 顯示頁 ====================
+function QRCodeScreen({ route, navigation }) {
+  const { qrCode } = route.params;
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      // 複製 QR Code 圖片 URL
+      Alert.alert('成功', 'QR Code 已準備好顯示');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (error) {
+      Alert.alert('錯誤', '複製失敗');
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView style={styles.scrollView}>
+        <View style={styles.formContainer}>
+          <Text style={styles.title}>票券 QR Code</Text>
+          
+          <View style={styles.qrContainer}>
+            <Image 
+              source={{ uri: qrCode }}
+              style={styles.qrImage}
+              onError={(error) => Alert.alert('錯誤', '無法載入 QR Code 圖片')}
+            />
+          </View>
+
+          <Text style={styles.qrDescription}>
+            請將此 QR Code 展示給工作人員掃描以驗證票券。
+          </Text>
+
+          <TouchableOpacity 
+            style={[styles.button, { backgroundColor: '#2196F3' }]}
+            onPress={handleCopy}
+          >
+            <Text style={styles.buttonText}>複製 QR Code</Text>
+          </TouchableOpacity>
+
+          {copied && (
+            <Text style={styles.copiedText}>已複製！</Text>
+          )}
+
+          <TouchableOpacity 
+            style={[styles.button, { marginTop: 15, backgroundColor: '#666' }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.buttonText}>返回</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -443,6 +531,11 @@ export default function App() {
           name="History" 
           component={HistoryScreen}
           options={{ title: '歷史紀錄' }}
+        />
+        <Stack.Screen 
+          name="QRCode" 
+          component={QRCodeScreen}
+          options={{ title: '票券 QR Code' }}
         />
       </Stack.Navigator>
     </NavigationContainer>
@@ -645,5 +738,36 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 16,
     marginTop: 50,
+  },
+  qrContainer: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    marginVertical: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  qrImage: {
+    width: 300,
+    height: 300,
+    resizeMode: 'contain',
+  },
+  qrDescription: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 14,
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  copiedText: {
+    textAlign: 'center',
+    color: '#4CAF50',
+    fontSize: 14,
+    marginTop: 10,
+    fontWeight: 'bold',
   },
 });

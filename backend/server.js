@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const bcrypt = require('bcrypt');
 const db = require('./database');
+const QRCode = require('qrcode');
 require('dotenv').config();
 
 const app = express();
@@ -219,6 +220,57 @@ app.get('/history', async (req, res) => {
   } catch (error) {
     console.error('查詢歷史紀錄錯誤:', error);
     res.status(500).json({ message: '查詢失敗' });
+  }
+});
+
+// 6. 生成 QR Code
+app.post('/generate-qr', async (req, res) => {
+  try {
+    const { data } = req.body;
+    
+    if (!data) {
+      return res.status(400).json({ message: '缺少數據' });
+    }
+
+    const qrCodeDataUrl = await QRCode.toDataURL(data, {
+      width: 300,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' }
+    });
+
+    res.json({ qrCode: qrCodeDataUrl });
+  } catch (error) {
+    console.error('生成 QR Code 錯誤:', error);
+    res.status(500).json({ message: '生成 QR Code 失敗' });
+  }
+});
+
+// 7. 生成票券 QR Code
+app.post('/generate-ticket-qr', async (req, res) => {
+  try {
+    const { strategy_id, user_id, ticket_number } = req.body;
+    
+    if (!strategy_id || !user_id) {
+      return res.status(400).json({ message: '缺少必要信息' });
+    }
+
+    const ticketData = JSON.stringify({
+      strategy_id,
+      user_id,
+      ticket_number: ticket_number || Math.random().toString(36).substring(7),
+      timestamp: new Date().toISOString()
+    });
+
+    const qrCodeDataUrl = await QRCode.toDataURL(ticketData, {
+      width: 300,
+      margin: 2,
+      color: { dark: '#000000', light: '#ffffff' }
+    });
+
+    res.json({ qrCode: qrCodeDataUrl, ticket_number: ticketData });
+  } catch (error) {
+    console.error('生成票券 QR Code 錯誤:', error);
+    res.status(500).json({ message: '生成票券 QR Code 失敗' });
   }
 });
 
