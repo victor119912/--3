@@ -11,13 +11,65 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// 模擬資料存儲（當無法連接真實資料庫時使用）
+const mockUsers = {};
+const mockStrategies = {};
+let userIdCounter = 1;
+let strategyIdCounter = 1;
+
+// 檢查是否使用模擬模式
+const useMockMode = () => !db.isConnected?.();
+
+// 輔助函數：執行查詢（支持模擬和真實）
+const query = async (sql, params) => {
+  if (useMockMode()) {
+    // 模擬模式
+    if (sql.includes('SELECT * FROM users WHERE username')) {
+      const username = params[0];
+      const user = Object.values(mockUsers).find(u => u.username === username);
+      return [[user || []], []];
+    }
+    if (sql.includes('INSERT INTO users')) {
+      const [username, password] = params;
+      const id = userIdCounter++;
+      mockUsers[id] = { id, username, password, created_at: new Date() };
+      return [{ insertId: id }, []];
+    }
+    if (sql.includes('SELECT * FROM strategies WHERE user_id')) {
+      const userId = params[0];
+      const records = Object.values(mockStrategies).filter(s => s.user_id === parseInt(userId));
+      return [[...records.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))], []];
+    }
+    if (sql.includes('INSERT INTO strategies')) {
+      const [userId, platform, entryTime, ticketType, network, successRate, suggestion] = params;
+      const id = strategyIdCounter++;
+      mockStrategies[id] = {
+        id,
+        user_id: userId,
+        platform,
+        entry_time: entryTime,
+        ticket_type: ticketType,
+        network,
+        success_rate: successRate,
+        suggestion,
+        created_at: new Date().toISOString()
+      };
+      return [{ insertId: id }, []];
+    }
+    return [[], []];
+  } else {
+    // 真實資料庫模式
+    return await db.query(sql, params);
+  }
+};
+
 // 1. 使用者註冊
 app.post('/register', async (req, res) => {
   try {
     const { username, password } = req.body;
 
     // 檢查使用者是否已存在
-    const [existingUsers] = await db.query(
+    const [existingUsers] = await query(
       'SELECT * FROM users WHERE username = ?',
       [username]
     );
@@ -30,7 +82,7 @@ app.post('/register', async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 存入資料庫
-    await db.query(
+    await query(
       'INSERT INTO users (username, password) VALUES (?, ?)',
       [username, hashedPassword]
     );
@@ -48,7 +100,7 @@ app.post('/login', async (req, res) => {
     const { username, password } = req.body;
 
     // 查詢使用者
-    const [users] = await db.query(
+    const [users] = await query(
       'SELECT * FROM users WHERE username = ?',
       [username]
     );
@@ -138,7 +190,7 @@ app.post('/simulate', async (req, res) => {
     }
 
     // 儲存到資料庫
-    await db.query(
+    await query(
       'INSERT INTO strategies (user_id, platform, entry_time, ticket_type, network, success_rate, suggestion) VALUES (?, ?, ?, ?, ?, ?, ?)',
       [user_id, platform, entry_time, ticket_type, network, success_rate, suggestion]
     );
@@ -158,7 +210,7 @@ app.get('/history', async (req, res) => {
   try {
     const { user_id } = req.query;
 
-    const [records] = await db.query(
+    const [records] = await query(
       'SELECT * FROM strategies WHERE user_id = ? ORDER BY created_at DESC',
       [user_id]
     );
@@ -172,5 +224,6 @@ app.get('/history', async (req, res) => {
 
 // 啟動伺服器
 app.listen(PORT, () => {
-  console.log(`伺服器運行於 http://localhost:${PORT}`);
+  const mode = useMockMode() ? '📱 模擬模式' : '📊 資料庫模式';
+  console.log(`\n✅ 伺服器運行於 http://localhost:${PORT} (${mode})\n`);
 });

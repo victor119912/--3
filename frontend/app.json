@@ -3,6 +3,7 @@
     "name": "ticket-simulator-app",
     "slug": "ticket-simulator-app",
     "version": "1.0.0",
+    "sdkVersion": "54.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
@@ -23,7 +24,9 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "package": "com.yourcompany.ticketsimulator"
+      "package": "com.yourcompany.ticketsimulator",
+      "targetSdkVersion": 54,
+      "compileSdkVersion": 54
     },
     "web": {
       "favicon": "./assets/favicon.png"

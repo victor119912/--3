@@ -9,17 +9,25 @@ const pool = mysql.createPool({
   database: process.env.DB_NAME || 'ticket_simulator',
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
+  enableKeepAlive: true,
+  keepAliveInitialDelayMs: 0
 });
 
 // 測試連線
+let dbConnected = false;
+
 pool.getConnection()
   .then(connection => {
-    console.log('資料庫連線成功！');
+    console.log('✅ 資料庫連線成功！');
+    dbConnected = true;
     connection.release();
   })
   .catch(err => {
-    console.error('資料庫連線失敗:', err);
+    console.warn('⚠️ 資料庫連線失敗，將使用模擬模式:', err.message);
+    dbConnected = false;
   });
 
+// 匯出連線池和狀態
 module.exports = pool;
+module.exports.isConnected = () => dbConnected;
