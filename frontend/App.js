@@ -14,10 +14,11 @@ import {
   Image
 } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
+import QRCode from 'react-native-qrcode-svg';
 import axios from 'axios';
 
 // 設定後端 API 網址
-const API_URL = 'http://192.168.0.24:3000'; // 實體手機連線使用電腦區網 IP
+const API_URL = 'http://192.168.0.62:3000'; // 實體手機連線使用電腦區網 IP
 // 若網段變動，請把 IP 更新成當下的電腦區網 IPv4
 
 const Stack = createStackNavigator();
@@ -280,10 +281,11 @@ function MainScreen({ route, navigation }) {
               selectedValue={platform}
               onValueChange={setPlatform}
               style={styles.picker}
+              itemStyle={{ color: '#000', fontSize: 16 }}
             >
-              <Picker.Item label="ibon" value="ibon" />
-              <Picker.Item label="KKTIX" value="KKTIX" />
-              <Picker.Item label="拓元" value="拓元" />
+              <Picker.Item label="ibon" value="ibon" color="#000" />
+              <Picker.Item label="KKTIX" value="KKTIX" color="#000" />
+              <Picker.Item label="拓元" value="拓元" color="#000" />
             </Picker>
           </View>
 
@@ -376,7 +378,6 @@ function QRCodeScreen({ route, navigation }) {
 
   const handleCopy = async () => {
     try {
-      // 複製 QR Code 圖片 URL
       Alert.alert('成功', 'QR Code 已準備好顯示');
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -387,16 +388,27 @@ function QRCodeScreen({ route, navigation }) {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.scrollView}>
+      <ScrollView style={styles.scrollView} contentContainerStyle={{ alignItems: 'center' }}>
         <View style={styles.formContainer}>
           <Text style={styles.title}>票券 QR Code</Text>
           
           <View style={styles.qrContainer}>
-            <Image 
-              source={{ uri: qrCode }}
-              style={styles.qrImage}
-              onError={(error) => Alert.alert('錯誤', '無法載入 QR Code 圖片')}
-            />
+            {qrCode && typeof qrCode === 'string' && qrCode.startsWith('data:image') ? (
+              // 顯示後端返回的 Base64 QR Code 圖片
+              <Image 
+                source={{ uri: qrCode }}
+                style={styles.qrImage}
+                onError={(error) => Alert.alert('錯誤', '無法載入 QR Code 圖片')}
+              />
+            ) : (
+              // 使用 react-native-qrcode-svg 生成 QR Code
+              <QRCode
+                value={qrCode || 'ticket-simulator'}
+                size={300}
+                color="black"
+                backgroundColor="white"
+              />
+            )}
           </View>
 
           <Text style={styles.qrDescription}>
@@ -622,9 +634,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     overflow: 'hidden',
+    height: 60,
+    justifyContent: 'center',
   },
   picker: {
-    height: 50,
+    height: 60,
+    color: '#000',
+    fontSize: 16,
   },
   button: {
     backgroundColor: '#007AFF',

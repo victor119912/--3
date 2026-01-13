@@ -7,138 +7,36 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = '192.168.0.62';
 
-// 記憶體暫存（無資料庫時使用）
-const memoryUsers = [];
-const memoryStrategies = [];
-let userIdCounter = 1;
-let strategyIdCounter = 1;
-let dbConnected = false;
-
-// 測試資料庫連線
-db.getConnection()
-  .then(connection => {
-    dbConnected = true;
-    console.log('資料庫連線成功，使用 MySQL');
-    connection.release();
-  })
-  .catch(err => {
-    console.log('資料庫連線失敗，使用記憶體暫存模式');
-  });
+// 記憶體資料存儲
+const memoryDB = db.getMemoryDB();
 
 // 中介軟體
 app.use(cors());
 app.use(express.json());
-
-// 模擬資料存儲（當無法連接真實資料庫時使用）
-const mockUsers = {};
-const mockStrategies = {};
-let userIdCounter = 1;
-let strategyIdCounter = 1;
-
-// 檢查是否使用模擬模式
-const useMockMode = () => !db.isConnected?.();
-
-// 輔助函數：執行查詢（支持模擬和真實）
-const query = async (sql, params) => {
-  if (useMockMode()) {
-    // 模擬模式
-    if (sql.includes('SELECT * FROM users WHERE username')) {
-      const username = params[0];
-      const user = Object.values(mockUsers).find(u => u.username === username);
-      return [[user || []], []];
-    }
-    if (sql.includes('INSERT INTO users')) {
-      const [username, password] = params;
-      const id = userIdCounter++;
-      mockUsers[id] = { id, username, password, created_at: new Date() };
-      return [{ insertId: id }, []];
-    }
-    if (sql.includes('SELECT * FROM strategies WHERE user_id')) {
-      const userId = params[0];
-      const records = Object.values(mockStrategies).filter(s => s.user_id === parseInt(userId));
-      return [[...records.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))], []];
-    }
-    if (sql.includes('INSERT INTO strategies')) {
-      const [userId, platform, entryTime, ticketType, network, successRate, suggestion] = params;
-      const id = strategyIdCounter++;
-      mockStrategies[id] = {
-        id,
-        user_id: userId,
-        platform,
-        entry_time: entryTime,
-        ticket_type: ticketType,
-        network,
-        success_rate: successRate,
-        suggestion,
-        created_at: new Date().toISOString()
-      };
-      return [{ insertId: id }, []];
-    }
-    return [[], []];
-  } else {
-    // 真實資料庫模式
-    return await db.query(sql, params);
-  }
-};
 
 // 1. 使用者註冊
 app.post('/register', async (req, res) => {
   try {
     const { username, password } = req.body;
 
-<<<<<<< HEAD
     // 檢查使用者是否已存在
-    const [existingUsers] = await query(
-      'SELECT * FROM users WHERE username = ?',
-      [username]
-    );
-=======
-    if (dbConnected) {
-      // 使用資料庫
-      const [existingUsers] = await db.query(
-        'SELECT * FROM users WHERE username = ?',
-        [username]
-      );
->>>>>>> f930e1de88aaadbbcb87cc0bb8cb4347a574436c
-
-      if (existingUsers.length > 0) {
-        return res.status(400).json({ message: '使用者名稱已存在' });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      await db.query(
-        'INSERT INTO users (username, password) VALUES (?, ?)',
-        [username, hashedPassword]
-      );
-    } else {
-      // 使用記憶體
-      const existingUser = memoryUsers.find(u => u.username === username);
-      if (existingUser) {
-        return res.status(400).json({ message: '使用者名稱已存在' });
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-      memoryUsers.push({
-        id: userIdCounter++,
-        username,
-        password: hashedPassword
-      });
+    const existingUser = Object.values(memoryDB.users).find(u => u.username === username);
+    if (existingUser) {
+      return res.status(400).json({ message: '使用者名稱已存在' });
     }
 
-<<<<<<< HEAD
-    // 加密密碼
     const hashedPassword = await bcrypt.hash(password, 10);
+    const userId = memoryDB.userIdCounter++;
+    
+    memoryDB.users[userId] = {
+      id: userId,
+      username,
+      password: hashedPassword,
+      created_at: new Date()
+    };
 
-    // 存入資料庫
-    await query(
-      'INSERT INTO users (username, password) VALUES (?, ?)',
-      [username, hashedPassword]
-    );
-
-=======
->>>>>>> f930e1de88aaadbbcb87cc0bb8cb4347a574436c
     res.json({ message: 'Register success' });
   } catch (error) {
     console.error('註冊錯誤:', error);
@@ -151,33 +49,10 @@ app.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
-<<<<<<< HEAD
     // 查詢使用者
-    const [users] = await query(
-      'SELECT * FROM users WHERE username = ?',
-      [username]
-    );
-=======
-    let user = null;
->>>>>>> f930e1de88aaadbbcb87cc0bb8cb4347a574436c
-
-    if (dbConnected) {
-      // 使用資料庫
-      const [users] = await db.query(
-        'SELECT * FROM users WHERE username = ?',
-        [username]
-      );
-
-      if (users.length === 0) {
-        return res.status(401).json({ message: '帳號或密碼錯誤' });
-      }
-      user = users[0];
-    } else {
-      // 使用記憶體
-      user = memoryUsers.find(u => u.username === username);
-      if (!user) {
-        return res.status(401).json({ message: '帳號或密碼錯誤' });
-      }
+    const user = Object.values(memoryDB.users).find(u => u.username === username);
+    if (!user) {
+      return res.status(401).json({ message: '帳號或密碼錯誤' });
     }
 
     // 驗證密碼
@@ -258,33 +133,19 @@ app.post('/simulate', async (req, res) => {
       suggestion = '建議改搶 3800 區並提早進場，使用快速網路';
     }
 
-<<<<<<< HEAD
-    // 儲存到資料庫
-    await query(
-      'INSERT INTO strategies (user_id, platform, entry_time, ticket_type, network, success_rate, suggestion) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [user_id, platform, entry_time, ticket_type, network, success_rate, suggestion]
-    );
-=======
-    // 儲存到資料庫或記憶體
-    if (dbConnected) {
-      await db.query(
-        'INSERT INTO strategies (user_id, platform, entry_time, ticket_type, network, success_rate, suggestion) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [user_id, platform, entry_time, ticket_type, network, success_rate, suggestion]
-      );
-    } else {
-      memoryStrategies.push({
-        id: strategyIdCounter++,
-        user_id,
-        platform,
-        entry_time,
-        ticket_type,
-        network,
-        success_rate,
-        suggestion,
-        created_at: new Date()
-      });
-    }
->>>>>>> f930e1de88aaadbbcb87cc0bb8cb4347a574436c
+    // 儲存到記憶體
+    const strategyId = memoryDB.strategyIdCounter++;
+    memoryDB.strategies[strategyId] = {
+      id: strategyId,
+      user_id,
+      platform,
+      entry_time,
+      ticket_type,
+      network,
+      success_rate,
+      suggestion,
+      created_at: new Date().toISOString()
+    };
 
     res.json({
       success_rate,
@@ -301,26 +162,9 @@ app.get('/history', async (req, res) => {
   try {
     const { user_id } = req.query;
 
-<<<<<<< HEAD
-    const [records] = await query(
-      'SELECT * FROM strategies WHERE user_id = ? ORDER BY created_at DESC',
-      [user_id]
-    );
-=======
-    let records = [];
-
-    if (dbConnected) {
-      const [dbRecords] = await db.query(
-        'SELECT * FROM strategies WHERE user_id = ? ORDER BY created_at DESC',
-        [user_id]
-      );
-      records = dbRecords;
-    } else {
-      records = memoryStrategies
-        .filter(s => s.user_id == user_id)
-        .sort((a, b) => b.created_at - a.created_at);
-    }
->>>>>>> f930e1de88aaadbbcb87cc0bb8cb4347a574436c
+    const records = Object.values(memoryDB.strategies)
+      .filter(s => s.user_id == user_id)
+      .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     res.json(records);
   } catch (error) {
@@ -381,7 +225,7 @@ app.post('/generate-ticket-qr', async (req, res) => {
 });
 
 // 啟動伺服器
-app.listen(PORT, () => {
-  const mode = useMockMode() ? '📱 模擬模式' : '📊 資料庫模式';
-  console.log(`\n✅ 伺服器運行於 http://localhost:${PORT} (${mode})\n`);
+app.listen(PORT, HOST, () => {
+  console.log(`\n✅ 伺服器運行於 http://${HOST}:${PORT} (記憶體儲存模式)\n`);
+  console.log(`🚀 前端連線地址: http://192.168.0.62:${PORT}\n`);
 });
