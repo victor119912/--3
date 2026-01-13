@@ -17,8 +17,8 @@ import { Picker } from '@react-native-picker/picker';
 import axios from 'axios';
 
 // 設定後端 API 網址
-const API_URL = 'http://localhost:3000'; // 開發時使用
-// 如果在實體手機測試，請改為電腦的區域網路 IP，例如：'http://192.168.1.100:3000'
+const API_URL = 'http://192.168.0.24:3000'; // 實體手機連線使用電腦區網 IP
+// 若網段變動，請把 IP 更新成當下的電腦區網 IPv4
 
 const Stack = createStackNavigator();
 
